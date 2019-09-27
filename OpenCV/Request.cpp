@@ -43,33 +43,75 @@ namespace POST
 {
 	int POST(string& login, string status, string countMove, string location, string Date/*, string& Pulse*/)
 	{
-		string POST_REQ = "login=";
-		POST_REQ += login;
-		POST_REQ += "&status=";
-		POST_REQ += status;
-		POST_REQ += "&countMove=";
-		POST_REQ += countMove;
-		POST_REQ += "&location=";
-		POST_REQ += location;
-		POST_REQ += "&creationDate=";
-		POST_REQ += Date;
-		int post_lenght = POST_REQ.length();
-		LPCSTR szAcceptBytes = "*/*";
-		//char* szData = new char[post_lenght];
-		char szData[] = "login=TEST&status=START&countMove=70&location=Cabinet1&creationDate=2019-09-27 18:35:00";
-		strcpy_s(szData, post_lenght, POST_REQ.c_str());
-		const char szHeaders[] = "Content-Type: application/x-www-form-urlencoded\r\n";
-		DWORD read;
-		string buffer(1024, '0');
-		//__memset(buffer, 0, sizeof(buffer));
-		HINTERNET hInet = InternetOpenA("Mozilla/4.0 (compatible; MSIE 6.0b; Windows NT 5.0; .NET CLR 1.0.2914)", INTERNET_OPEN_TYPE_PRECONFIG, "", "", 0);
-		HINTERNET hSession = InternetConnectA(hInet, "hack.ksu.ru.com", 100, "", "", INTERNET_SERVICE_HTTP, 0, 1u);
-		HINTERNET hRequest = HttpOpenRequestA(hSession, "POST", "/php/api/person/create.php", NULL, "hack.ksu.ru.com", 0, 0, 1);
-		HttpSendRequestA(hRequest, szHeaders, sizeof(szHeaders) - 1, szData, sizeof(szData) - 1);
-		InternetReadFile(hRequest, &buffer, sizeof(buffer), &read);
-		InternetCloseHandle(hRequest);
-		InternetCloseHandle(hSession);
-		InternetCloseHandle(hInet);
+		
 		return 0;
 	}
+
+	int request(const char* hostname, string message)
+	{
+		WSADATA WsaData;
+		WSAStartup(0x0101, &WsaData);
+		sockaddr_in       sin;
+		int sock = socket(AF_INET, SOCK_STREAM, 0);
+		if (sock == -1) {
+			return -100;
+		}
+		sin.sin_family = AF_INET;
+		sin.sin_port = htons(100);
+
+		struct hostent * host_addr = gethostbyname(hostname);
+
+		sin.sin_addr.s_addr = *((int*)*host_addr->h_addr_list);
+
+		connect(sock, (const struct sockaddr *)&sin, sizeof(sockaddr_in));
+		
+		int er = send(sock, "POST http://hack.ksu.ru.com:100/php/api/person/create.php HTTP/1.1\r\nHost: http://hack.ksu.ru.com\r\nReferer: http://hack.ksu.ru.com\r\nContent-Length: 190\r\n\r\nlogin=HMMMM&status=START&countMove=70&location=Cabinet1&creationDate=2019-09-27 18:35:59", strlen("POST http://hack.ksu.ru.com:100/php/api/person/create.php HTTP/1.1\r\nHost: http://hack.ksu.ru.com\r\nReferer: http://hack.ksu.ru.com\r\nContent-Length: 190\r\n\r\nlogin=HMMMM&status=START&countMove=70&location=Cabinet1&creationDate=2019-09-27 18:35:59"), 0);
+		
+
+		cout << "####HEADER####" << endl;
+		char c1[1];
+		int l, line_length;
+		bool loop = true;
+		bool bHeader = false;
+
+		while (loop)
+		{
+			l = recv(sock, c1, 1, 0);
+			if (l < 0) loop = false;
+			if (c1[0] == '\n')
+			{
+				if (line_length == 0) loop = false;
+				line_length = 0;
+				if (message.find("200") != string::npos)
+					bHeader = true;
+			}
+			else {
+				if (c1[0] != '\r') {
+					line_length++;
+				}
+			}
+			cout << c1[0];
+			message += c1[0];
+		}
+
+		message = "";
+		if (bHeader)
+		{
+			cout << "####BODY####" << endl;
+			char p[1024 * 10];
+			l = recv(sock, p, 1024 * 10 - 1, 0);
+			p[l] = '\0';
+			message += p;
+			cout << message.c_str();
+		}
+		else {
+			return -102;
+		}
+		cout << "end";
+		closesocket(sock);
+		WSACleanup();
+
+		return 0;
+	}
+
 }

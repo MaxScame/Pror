@@ -1,4 +1,6 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
+#include <ctime>
 
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -40,10 +42,17 @@ int main(int argc, char *argv[])
 	VideoCapture capture(0);
 	capture.set(15, -5.5);
 
+	time_t now = time(0);
+	tm *ltm = localtime(&now);
 
 	string Name = UserName();
-	if (POST::POST(Name, "Start", "42", "240b", "2019-09-09 13:37:42"))
-		cout << "Cool" << endl;
+	string status = "START";
+	string countMove = "42";
+	string location = "0812";
+	string Date = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) +
+		"%20" + to_string(ltm->tm_hour) + ":" + to_string(1 + ltm->tm_min) + ":" + to_string(1 + ltm->tm_sec);
+	string params = "python req.py " + Name + " " + status + " " + countMove + " " + location + " " + Date;
+	system(params.c_str());
 
 	if (!capture.isOpened())
 	{
