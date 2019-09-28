@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
 		}
 		add(frame, mask, img);
 		imshow("RealTime Tracking", img);
-		imwrite("frame.jpg", img);
+		imwrite("frame.jpg", frame);
 		int keyboard = waitKey(FPS(30));
 		// Обновление предыдущего состояния
 		old_gray = frame_gray.clone();
@@ -223,6 +223,10 @@ int main(int argc, char *argv[])
 		if (c == 27 || c == 'q' || c == 'Q')
 			break;	
 	}
+	string st = "STOP";
+	string cm = to_string(gCountMove);
+	string pl = to_string(rng.uniform(70, 85));
+	POST::SEND_POST(Status, cm, pl, Location);
 	SendThread::_PowerOff();
 	unique_lock<mutex> sock_lock(post_request_thread_mutex);
 	PostRequestThreadStatus.wait(sock_lock, []() { return post_request_thread_status == 1; });
