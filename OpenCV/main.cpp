@@ -70,7 +70,7 @@ namespace Active
 
 namespace SendThread
 {
-	void _Check()
+	void _PowerOff()
 	{
 		ThreadIsOpen = false;
 	}
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
 		// Подбор можно осуществлять нейронками
 		putText(frame, format("StandUp: %.1f; HeadRot: %.1f; Stable: %.1f; SlowDown: %.1f; HandShake: %.1f", temp[0], temp[1], temp[2], temp[3], temp[4]), Point(20, 55), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(32, 255, 32), 2.0);
 		putText(frame, format("Move/2sec %d", gCountMove), Point(20, 75), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(25, 255, 10), 2.0);
-		if (DeltaPerFrame.x > 1.9f || DeltaPerFrame.y > 2.0f)
+		if (DeltaPerFrame.x > 0.7f || DeltaPerFrame.y > 0.7f)
 		{
 			MaxAvgDelta2sec = DeltaPerFrame;
 			putText(frame, format("d(%.1f;%.1f)", DeltaPerFrame.x, DeltaPerFrame.y), Point(20, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
@@ -223,9 +223,10 @@ int main(int argc, char *argv[])
 		if (c == 27 || c == 'q' || c == 'Q')
 			break;	
 	}
-	SendThread::_Check();
+	SendThread::_PowerOff();
 	unique_lock<mutex> sock_lock(post_request_thread_mutex);
 	PostRequestThreadStatus.wait(sock_lock, []() { return post_request_thread_status == 1; });
 	cout << "POST thread closed." << endl;
+
 	//of.close();
 }
