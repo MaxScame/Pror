@@ -166,6 +166,15 @@ int main(int argc, char *argv[])
 		vector<unsigned char> status;
 		vector<float> err;
 		TermCriteria criteria = TermCriteria((TermCriteria::COUNT) | (TermCriteria::EPS), 10, 0.05);
+		if (vOldPoints.size() <= 10 && vNewPoints.size() <= 10)
+		{
+			// Получаем первый кадр и ищем на нём углы
+			capture >> old_frame;
+			cvtColor(old_frame, old_gray, COLOR_BGR2GRAY);
+			goodFeaturesToTrack(old_gray, vOldPoints, MAX_CORNERS, 0.01, 20, Mat(), 20, false, 0.04);
+			// Создание маски разницы
+			mask = Mat::zeros(old_frame.size(), old_frame.type());
+		}
 		calcOpticalFlowPyrLK(old_gray, frame_gray, vOldPoints, vNewPoints, status, err, Size(50, 50), 1, criteria);
 		vector<Point2f> NewValidPoints;
 		Point2f DeltaPerFrame = { 0.0, 0.0 }; // Дельта перемещения по точкам что в движении
