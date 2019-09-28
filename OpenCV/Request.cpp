@@ -48,7 +48,7 @@ namespace POST
 		tm *ltm = localtime(&now);
 		string Login = UserName();
 		string Date = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) +
-			"%20" + to_string(ltm->tm_hour) + ":" + to_string(1 + ltm->tm_min) + ":" + to_string(1 + ltm->tm_sec);
+			"%20" + to_string(ltm->tm_hour) + ":" + to_string(ltm->tm_min) + ":" + to_string(ltm->tm_sec);
 		string params = "python req.py " + Login + " " + Status + " " + CountMove + " " + Pulse + " " + Location + " " + Date;
 		system(params.c_str());
 	}

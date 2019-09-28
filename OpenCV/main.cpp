@@ -1,4 +1,6 @@
 #include <iostream>
+#include <condition_variable>
+#include <mutex>
 #include <ctime>
 
 #include <opencv2/core.hpp>
@@ -9,12 +11,22 @@
 
 #include "Request.h"
 
+#define POST_TIME_IN_MS 2000
 #define MAX_CORNERS 505
 #define STATUS_OK 1
 #define FPS(x) int(1000/int(x))
+#define TIME_TO_SEND_IN_THREAD 60 // FPSx2
 
 using namespace cv;
 using namespace std;
+
+/// Переменные для синхронизации потока, в котором подняли сокет
+condition_variable PostRequestThreadStatus;
+bool post_request_thread_status = 0;
+mutex post_request_thread_mutex;
+bool ThreadIsOpen = true;
+unsigned gCountMove = 0;
+
 
 namespace cvvv
 {
@@ -34,7 +46,6 @@ namespace cvvv
 		return temp;
 	}
 }
-
 
 namespace Active
 {
@@ -57,11 +68,42 @@ namespace Active
 	}
 }
 
+namespace SendThread
+{
+	void _Check()
+	{
+		ThreadIsOpen = false;
+	}
+
+	void _Send(RNG& rng, string& Status, string& Location)
+	{
+		while (ThreadIsOpen)
+		{
+			string st;
+			rng.uniform(0, 1) == 1 ? st += "START" : st += "STOP";
+			string cm = to_string(gCountMove);
+			string pl = to_string(rng.uniform(70, 85));
+			POST::SEND_POST(Status, cm, pl, Location);
+			Sleep(POST_TIME_IN_MS);
+		}
+
+		post_request_thread_status = 1;
+		PostRequestThreadStatus.notify_one();
+	}
+
+	thread SendPostThread(RNG& rng, string& Status, string& Location)
+	{
+		thread th(_Send, ref(rng), ref(Status), ref(Location));
+		th.detach();
+		return th;
+	}
+}
 
 int main(int argc, char *argv[])
 {
 	VideoCapture capture(0);
 	capture.set(15, -5.5);
+	//capture.set(15, -8.5); // Для солнечного дня
 
 	string Status;
 	string CountMove;
@@ -69,10 +111,10 @@ int main(int argc, char *argv[])
 	string Pulse;
 	if (argc > 1 && argc == 4)
 	{
-		Status = argv[1];
-		CountMove = argv[2];
-		Pulse = argv[3];
-		Location = argv[4];
+		Status = argv[1]; // START, STOP
+		CountMove = argv[2]; // Число
+		Pulse = argv[3]; // Число
+		Location = argv[4]; // Строка
 	}
 	else
 	{
@@ -82,8 +124,7 @@ int main(int argc, char *argv[])
 		Location = "0812";
 	}
 	
-	POST::SEND_POST(Status, CountMove, Pulse, Location);
-
+	
 	if (!capture.isOpened())
 	{
 		cerr << "Camera is not conected!" << endl;
@@ -99,6 +140,8 @@ int main(int argc, char *argv[])
 		int b = rng.uniform(0, 256);
 		colors.push_back(Scalar(r, g, b));
 	}
+
+
 	Mat old_frame, old_gray;
 	vector<Point2f> vOldPoints, vNewPoints;
 	// Получаем первый кадр и ищем на нём углы
@@ -109,8 +152,11 @@ int main(int argc, char *argv[])
 	Mat mask = Mat::zeros(old_frame.size(), old_frame.type());
 	Point2f MaxAvgDelta2sec = { 0.0, 0.0 }; // Максимальное значение дельты за время измерений
 	//ofstream of("res.txt");
+	thread post_th = SendThread::SendPostThread(rng, Status, Location);
+	unsigned counter = 0;
 	while (true)
 	{
+		counter++;
 		Mat frame, frame_gray;
 		capture >> frame;
 		if (frame.empty())
@@ -131,7 +177,7 @@ int main(int argc, char *argv[])
 			{
 				NewValidPoints.push_back(vNewPoints[i]);
 				// Отрисовка треков
-				line(mask, vNewPoints[i], vOldPoints[i], colors[i], 2);
+				line(mask, vNewPoints[i], vOldPoints[i], colors[i], 1);
 				circle(frame, vNewPoints[i], 3, colors[i], -1);
 				DeltaPerFrame += cvvv::abs((vNewPoints[i] - vOldPoints[i]));
 			}
@@ -143,17 +189,28 @@ int main(int argc, char *argv[])
 		// Данные коэффициенты должны стремиться к нулю, что означало бы полное соответствие прогнозам
 		// Подбор можно осуществлять нейронками
 		putText(frame, format("StandUp: %.1f; HeadRot: %.1f; Stable: %.1f; SlowDown: %.1f; HandShake: %.1f", temp[0], temp[1], temp[2], temp[3], temp[4]), Point(20, 55), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(32, 255, 32), 2.0);
-		if (DeltaPerFrame.x > 3.5f || DeltaPerFrame.y > 3.5f)
+		putText(frame, format("Move/2sec %d", gCountMove), Point(20, 75), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(25, 255, 10), 2.0);
+		if (DeltaPerFrame.x > 1.9f || DeltaPerFrame.y > 2.0f)
 		{
 			MaxAvgDelta2sec = DeltaPerFrame;
 			putText(frame, format("d(%.1f;%.1f)", DeltaPerFrame.x, DeltaPerFrame.y), Point(20, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
 			putText(frame, format("| MAX: d(%.1f;%.1f)", MaxAvgDelta2sec.x, MaxAvgDelta2sec.y), Point(105, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
 			//of << MaxAvgDelta2sec.x << "\t" << MaxAvgDelta2sec.y << endl;
+			if (counter < TIME_TO_SEND_IN_THREAD)
+			{
+				gCountMove++;
+			}
 		}
 		else
 		{
 			putText(frame, format("d(%.1f;%.1f)", DeltaPerFrame.x, DeltaPerFrame.y), Point(20, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(0, 255, 128), 2.0);
 			putText(frame, format("| MAX: d(%.1f;%.1f)", MaxAvgDelta2sec.x, MaxAvgDelta2sec.y), Point(105, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
+		}
+
+		if (counter == TIME_TO_SEND_IN_THREAD)
+		{
+			counter = 0;
+			gCountMove = 0;
 		}
 		add(frame, mask, img);
 		imshow("RealTime Tracking", img);
@@ -162,6 +219,13 @@ int main(int argc, char *argv[])
 		// Обновление предыдущего состояния
 		old_gray = frame_gray.clone();
 		vOldPoints = NewValidPoints;
+		char c = (char)waitKey(10);
+		if (c == 27 || c == 'q' || c == 'Q')
+			break;	
 	}
+	SendThread::_Check();
+	unique_lock<mutex> sock_lock(post_request_thread_mutex);
+	PostRequestThreadStatus.wait(sock_lock, []() { return post_request_thread_status == 1; });
+	cout << "POST thread closed." << endl;
 	//of.close();
 }
