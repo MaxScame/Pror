@@ -41,13 +41,19 @@ string UserName()
 
 namespace POST
 {
-	int POST(string& login, string status, string countMove, string location, string Date/*, string& Pulse*/)
+	// Отправка POST-запроса на сервер вместе с фото человека и временными маркерами
+	void SEND_POST(string& Status, string& CountMove, string& Pulse, string& Location)
 	{
-		
-		return 0;
+		time_t now = time(0);
+		tm *ltm = localtime(&now);
+		string Login = UserName();
+		string Date = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday) +
+			"%20" + to_string(ltm->tm_hour) + ":" + to_string(1 + ltm->tm_min) + ":" + to_string(1 + ltm->tm_sec);
+		string params = "python req.py " + Login + " " + Status + " " + CountMove + " " + Pulse + " " + Location + " " + Date;
+		system(params.c_str());
 	}
 
-	int request(const char* hostname, string message)
+	/*int request(const char* hostname, string message)
 	{
 		WSADATA WsaData;
 		WSAStartup(0x0101, &WsaData);
@@ -112,6 +118,6 @@ namespace POST
 		WSACleanup();
 
 		return 0;
-	}
+	}*/
 
 }
