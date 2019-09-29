@@ -11,11 +11,11 @@
 
 #include "Request.h"
 
-#define POST_TIME_IN_MS 2000
-#define MAX_CORNERS 505
+#define POST_TIME_IN_MS 1000
+#define MAX_CORNERS 500
 #define STATUS_OK 1
 #define FPS(x) int(1000/int(x))
-#define TIME_TO_SEND_IN_THREAD 60 // FPSx2
+#define SEC_TO_SEND_IN_THREAD 30 // FPSxSec
 
 using namespace cv;
 using namespace std;
@@ -166,10 +166,8 @@ int main(int argc, char *argv[])
 		vector<unsigned char> status;
 		vector<float> err;
 		TermCriteria criteria = TermCriteria((TermCriteria::COUNT) | (TermCriteria::EPS), 10, 0.05);
-		if (vOldPoints.size() <= 10 && vNewPoints.size() <= 10)
+		if (vOldPoints.size() <= int(MAX_CORNERS / 10) && vNewPoints.size() <= int(MAX_CORNERS / 10))
 		{
-			// Получаем первый кадр и ищем на нём углы
-			capture >> old_frame;
 			cvtColor(old_frame, old_gray, COLOR_BGR2GRAY);
 			goodFeaturesToTrack(old_gray, vOldPoints, MAX_CORNERS, 0.01, 20, Mat(), 20, false, 0.04);
 			// Создание маски разницы
@@ -198,14 +196,14 @@ int main(int argc, char *argv[])
 		// Данные коэффициенты должны стремиться к нулю, что означало бы полное соответствие прогнозам
 		// Подбор можно осуществлять нейронками
 		putText(frame, format("StandUp: %.1f; HeadRot: %.1f; Stable: %.1f; SlowDown: %.1f; HandShake: %.1f", temp[0], temp[1], temp[2], temp[3], temp[4]), Point(20, 55), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(32, 255, 32), 2.0);
-		putText(frame, format("Move/2sec %d", gCountMove), Point(20, 75), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(25, 255, 10), 2.0);
-		if (DeltaPerFrame.x > 0.7f || DeltaPerFrame.y > 0.7f)
+		putText(frame, format("Move/0.2sec %d", gCountMove), Point(20, 75), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(25, 255, 10), 2.0);
+		if (DeltaPerFrame.x > 1.5f || DeltaPerFrame.y > 1.5f)
 		{
 			MaxAvgDelta2sec = DeltaPerFrame;
 			putText(frame, format("d(%.1f;%.1f)", DeltaPerFrame.x, DeltaPerFrame.y), Point(20, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
 			putText(frame, format("| MAX: d(%.1f;%.1f)", MaxAvgDelta2sec.x, MaxAvgDelta2sec.y), Point(105, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
 			//of << MaxAvgDelta2sec.x << "\t" << MaxAvgDelta2sec.y << endl;
-			if (counter < TIME_TO_SEND_IN_THREAD)
+			if (counter < SEC_TO_SEND_IN_THREAD)
 			{
 				gCountMove++;
 			}
@@ -216,13 +214,17 @@ int main(int argc, char *argv[])
 			putText(frame, format("| MAX: d(%.1f;%.1f)", MaxAvgDelta2sec.x, MaxAvgDelta2sec.y), Point(105, 25), FONT_HERSHEY_PLAIN, 1.0, CV_RGB(255, 25, 10), 2.0);
 		}
 
-		if (counter == TIME_TO_SEND_IN_THREAD)
+		if (counter == SEC_TO_SEND_IN_THREAD)
 		{
 			counter = 0;
 			gCountMove = 0;
 		}
 		add(frame, mask, img);
 		imshow("RealTime Tracking", img);
+		//Size size(320, 240);
+		//Mat SmallFrame;
+		//resize(frame, SmallFrame, size);
+		//imwrite("frame.jpg", SmallFrame);
 		imwrite("frame.jpg", frame);
 		int keyboard = waitKey(FPS(30));
 		// Обновление предыдущего состояния
